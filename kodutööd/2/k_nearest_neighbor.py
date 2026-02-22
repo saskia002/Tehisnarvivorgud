@@ -1,8 +1,8 @@
 import torch
 
 class KNearestNeighbor(object):
-    """ 
-        A kNN classifier with L2 distance using PyTorch 
+    """
+        A kNN classifier with L2 distance using PyTorch
     """
 
     # initialize torch variables
@@ -18,18 +18,56 @@ class KNearestNeighbor(object):
         Inputs:
             X: PyTorch Tensor of shape (num_train, D)
             y: PyTorch Tensor of shape (num_train,)
-        
+
         """
 
         self.X_train = X
         self.y_train = y
 
 
+    def predict(self, X, k=1, num_loops=0):
+
+        """
+            Predict labels for test data using this classifier.
+
+            Inputs:
+
+            - X: A torch tensor of shape (num_test, D) containing test data consisting
+                of num_test samples each of dimension D.
+            - k: The number of nearest neighbors that vote for the predicted labels.
+            - num_loops: Determines which implementation to use to compute distances
+            between training points and testing points.
+
+            Returns:
+            - y: A torch tensor of shape (num_test,) containing predicted labels for the
+            test data, where y[i] is the predicted label for the test point X[i].
+
+        """
+
+        if num_loops == 0:
+
+            dists = self.compute_distances_no_loops(X)
+
+        elif num_loops == 1:
+
+            dists = self.compute_distances_one_loop(X)
+
+        elif num_loops == 2:
+
+            dists = self.compute_distances_two_loops(X)
+
+        else:
+
+            raise ValueError('Invalid value %d for num_loops' % num_loops)
+
+        return self.predict_labels(dists, k=k)
+
+
     def compute_distances_two_loops(self, X):
 
         """
             Compute the distance between each test point in X and each training point
-            in self.X_train using a nested loop over both the training data and the 
+            in self.X_train using a nested loop over both the training data and the
             test data.
 
             Inputs:
@@ -49,36 +87,20 @@ class KNearestNeighbor(object):
 
         for i in range(num_test):
             for j in range(num_train):
-                
+
                 #####################################################################
-                # TODO Task 2.1:                                                             #
+                # TODO Task 2.1:                                                    #
                 # Compute the l2 distance between the ith test point and the jth    #
                 # training point, and store the result in dists[i, j]. You should   #
                 # not use a loop over dimension.                                    #
                 #####################################################################
-
-
-
+                dists[i, j] = torch.sqrt( torch.sum( (X[i] - self.X_train[j]) ** 2 ) )
                 #####################################################################
                 #                       END OF YOUR CODE                            #
                 #####################################################################
 
         return dists
 
-
-    def predict_labels(self, dists, k=1):
-
-        num_test = dists.shape[0]
-        y_pred = torch.zeros(num_test, dtype=torch.int64)
-
-        for i in range(num_test):
-            
-            closest_idx = torch.argsort(dists[i])[:k]
-            closest_y = self.y_train[closest_idx]
-
-            y_pred[i] = torch.bincount(closest_y).argmax()
-
-        return y_pred
 
     def compute_distances_one_loop(self, X):
 
@@ -102,7 +124,7 @@ class KNearestNeighbor(object):
             # points, and store the result in dists[i, :].  #broadcasting         #
             #######################################################################
 
-
+            dists[i, :] = torch.sqrt( torch.sum( (X[i] - self.X_train) ** 2, dim=1 ) )
 
             #######################################################################
             #                       END OF YOUR CODE                                #
@@ -112,7 +134,7 @@ class KNearestNeighbor(object):
 
 
     def compute_distances_no_loops(self, X):
-        
+
         """
             Compute the distance between each test point in X and each training point
             in self.X_train using no explicit loops.
@@ -137,51 +159,13 @@ class KNearestNeighbor(object):
         #       formulate it using matrix multiplication and two broadcast sums.#
         #########################################################################
 
-        
-        
+        dists = torch.sqrt( torch.sum(self.X_train ** 2, dim=1) - 2 * X @ self.X_train.T + torch.sum(X ** 2, dim=1).unsqueeze(1) )
 
         #########################################################################
         #                         END OF YOUR CODE                              #
         #########################################################################
 
         return dists
-
-    def predict(self, X, k=1, num_loops=0):
-    
-        """
-            Predict labels for test data using this classifier.
-
-            Inputs:
-
-            - X: A torch tensor of shape (num_test, D) containing test data consisting
-                of num_test samples each of dimension D.
-            - k: The number of nearest neighbors that vote for the predicted labels.
-            - num_loops: Determines which implementation to use to compute distances
-            between training points and testing points.
-
-            Returns:
-            - y: A torch tensor of shape (num_test,) containing predicted labels for the
-            test data, where y[i] is the predicted label for the test point X[i].  
-        
-        """
-
-        if num_loops == 0:
-
-            dists = self.compute_distances_no_loops(X)
-
-        elif num_loops == 1:
-
-            dists = self.compute_distances_one_loop(X)
-
-        elif num_loops == 2:
-
-            dists = self.compute_distances_two_loops(X)
-
-        else:
-
-            raise ValueError('Invalid value %d for num_loops' % num_loops)
-
-        return self.predict_labels(dists, k=k)
 
     def predict_labels(self, dists, k=1):
 
@@ -195,14 +179,14 @@ class KNearestNeighbor(object):
 
             Returns:
             - y: A torch tensor of shape (num_test,) containing predicted labels for the
-            test data, where y[i] is the predicted label for the test point X[i].  
+            test data, where y[i] is the predicted label for the test point X[i].
         """
 
         num_test = dists.shape[0]
 
         # Create y_pred on the same device as dists (CPU or GPU)
         y_pred = torch.zeros( num_test, dtype=torch.long, device=dists.device )
-        
+
         for i in range(num_test):
 
             #########################################################################
@@ -212,8 +196,8 @@ class KNearestNeighbor(object):
             # neighbors. Store these labels in closest_y.                           #
             # Hint: Look up the function numpy.argsort or torch.topk.               #
             #########################################################################
-            
 
+            closest_y = self.y_train[torch.topk(dists[i], k, largest=False).indices]
 
             #########################################################################
             # TODO:                                                                 #
@@ -222,14 +206,14 @@ class KNearestNeighbor(object):
             # Store this label in y_pred[i]. Break ties by choosing the smaller     #
             # label. Hint: Look up the functions torch.bincount and torch.argmax.   #
             #########################################################################
-            
+
             # Find the most common label
             # torch.bincount works like np.bincount
             counts = torch.bincount(closest_y)
             y_pred[i] = torch.argmax(counts)
 
         #########################################################################
-        #                           END OF YOUR CODE                            # 
+        #                           END OF YOUR CODE                            #
         #########################################################################
 
         return y_pred
