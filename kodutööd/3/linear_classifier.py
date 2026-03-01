@@ -8,7 +8,7 @@ class LinearClassifier(object):
 
     def train(self, X, y, learning_rate=1e-3, reg=1e-5, num_iters=100,
               batch_size=200, verbose=False):
-        
+
         """
         Train this linear classifier using stochastic gradient descent.
 
@@ -29,9 +29,9 @@ class LinearClassifier(object):
 
         device = X.device
         num_train, dim = X.shape
-        
+
         num_classes = torch.max(y).item() + 1  # assume y takes values 0...K-1 where K is number of classes
-        
+
         if self.W is None:
             # Lazily initialize W on the same device as data
             self.W = 0.001 * torch.randn(dim, int(num_classes), device=device, dtype=X.dtype)
@@ -51,6 +51,10 @@ class LinearClassifier(object):
             # Hint: Use np.random.choice to generate indices. Sampling with         #
             # replacement is faster than sampling without replacement.              #
             #########################################################################
+
+            indices = torch.randperm(num_train)[:batch_size]
+            X_batch = X[indices]
+            y_batch = y[indices]
 
             #########################################################################
             #                       END OF YOUR CODE                                #
@@ -85,7 +89,7 @@ class LinearClassifier(object):
         return loss_history
 
     def predict(self, X):
-        
+
 
         """
         Use the trained weights of this linear classifier to predict labels for
@@ -105,10 +109,13 @@ class LinearClassifier(object):
         # Implement this method. Store the predicted labels in y_pred.            #
         ###########################################################################
 
+        scores = X @ self.W
+        _, y_pred = torch.max(scores, dim=1)
+
         ###########################################################################
         #                           END OF YOUR CODE                              #
         ###########################################################################
-        
+
         return y_pred
 
 

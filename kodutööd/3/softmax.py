@@ -1,4 +1,4 @@
-import torch 
+import torch
 
 def softmax_loss_naive(W, X, y, reg):
 
@@ -22,8 +22,8 @@ def softmax_loss_naive(W, X, y, reg):
     - gradient with respect to weights W; an array of same shape as W
     """
 
-    y = y.to(torch.long) 
-    
+    y = y.to(torch.long)
+
     W = W.to(torch.float64)
     X = X.to(torch.float64)
 
@@ -35,7 +35,7 @@ def softmax_loss_naive(W, X, y, reg):
     for i in range(num_train):
 
         #############################################################################
-        # TODO Task 3.1: 
+        # TODO Task 3.1:
         # Compute the cross-entropy loss using explicit loops and store the   #
         # sum of losses in "loss". If you already understand the process well       #
         # and are familiar with vectorized operations, you can solve this task      #
@@ -46,10 +46,15 @@ def softmax_loss_naive(W, X, y, reg):
         # Read the Practical issues: numeric stability section from here:           #
         # https://cs231n.github.io/linear-classify/#softmax-classifier              #
         #############################################################################
-        
-        # softmax 
-        
+
+        # softmax function: f(x_i) = exp(x_i) / sum_j exp(x_j)
+        z = X[i] @ W  # or .mm(W)
+        z -= torch.max(z)
+        exp_z = torch.exp(z)
+        p = exp_z / torch.sum(exp_z)
+
         # loss: -log(p) of the correct class
+        loss += -torch.log(p[y[i]])
 
         #############################################################################
         # TODO Task 3.3:                                                            #
@@ -57,7 +62,11 @@ def softmax_loss_naive(W, X, y, reg):
         # samples in dW. Again, you are allowed to use vectorized operations        #
         # if you know how to.                                                       #
         #############################################################################
-         
+
+        # Compute gradient for sample i
+        dW += X[i].unsqueeze(1) @ p.unsqueeze(0)  # shape (D, C)
+        dW[:, y[i]] -= X[i]  # subtract X[i] for the correct class
+
 
         #############################################################################
         #                          END OF YOUR CODE                                 #
@@ -69,12 +78,12 @@ def softmax_loss_naive(W, X, y, reg):
 
     # Regularization
     loss += reg * torch.sum(W * W)
-    dW += 2 * reg * W 
+    dW += 2 * reg * W
 
     return loss, dW
 
 def softmax_loss_vectorized(W, X, y, reg):
-    
+
 
     """
     Softmax (cross-entropy) loss function, vectorized version.
@@ -85,23 +94,41 @@ def softmax_loss_vectorized(W, X, y, reg):
     W = W.to(torch.float64)
     X = X.to(torch.float64)
     y = y.to(torch.long)
-    
+
     num_train = X.shape[0]
 
     #############################################################################
-    # TODO Task 3.4:                                                            # 
+    # TODO Task 3.4:                                                            #
     # Compute the cross-entropy loss and its gradient using no loops.           #
     # Store the loss in loss and the gradient in dW.                            #
     # Make sure you take the average.                                           #
     # If you are not careful with softmax, you migh run into numeric instability#
     #############################################################################
-    
-    # Compute probabilities
+
+    scores = X.mm(W)  # (N, C)
+
+    # Numeric stability fix
+    scores -= torch.max(scores, dim=1, keepdim=True)[0]
+
+    # Softmax probabilities
+    exp_scores = torch.exp(scores)
+    probs = exp_scores / torch.sum(exp_scores, dim=1, keepdim=True)  # (N, C)
+
+    # Cross-entropy loss
+    correct_log_probs = -torch.log(probs[torch.arange(num_train), y])
+    loss = torch.sum(correct_log_probs) / num_train
+
+    # Gradient computation
+    dscores = probs.clone()
+    dscores[torch.arange(num_train), y] -= 1
+    dscores /= num_train
+
+    dW = X.t().mm(dscores)
 
     #############################################################################
     #                          END OF YOUR CODE                                 #
     #############################################################################
-    
+
     # Add regularization to the loss and gradients.
     loss += reg * torch.sum(W * W)
     dW += 2 * reg * W
